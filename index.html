@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#16352f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="영어 선생님">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-180.png" sizes="180x180">
+  <title>영어 선생님</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="phone">
+    <header class="top">
+      <div>
+        <p class="eyebrow">한국어로 묻고, 영어로 말하기</p>
+        <h1>영어 선생님</h1>
+      </div>
+      <button type="button" id="clearBtn">지우기</button>
+    </header>
+    <main id="log"></main>
+    <p id="status" class="status" role="status"></p>
+    <button type="button" id="mic" class="hold" aria-pressed="false" aria-label="화면을 누른 채로 한국어로 말하고, 손을 떼면 선생님이 소리로 답해요">
+      <span id="micLabel">누르고 말하기</span>
+    </button>
+    <form id="form" hidden>
+      <label class="sr-only" for="input">한국어 입력</label>
+      <input id="input" type="text" inputmode="text" placeholder="한국어로 쓰기" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
+      <button type="submit">보내기</button>
+    </form>
+  </div>
+  <noscript>이 앱은 자바스크립트가 필요해요.</noscript>
+  <script src="engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
