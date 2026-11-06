@@ -24,12 +24,15 @@
     </header>
     <main id="log"></main>
     <p id="status" class="status" role="status"></p>
-    <button type="button" id="mic" class="hold" aria-pressed="false" aria-label="화면을 누른 채로 한국어로 말하고, 손을 떼면 선생님이 소리로 답해요">
-      <span id="micLabel">누르고 말하기</span>
-    </button>
-    <form id="form" hidden>
+    <form id="form">
       <label class="sr-only" for="input">한국어 입력</label>
       <input id="input" type="text" inputmode="text" placeholder="한국어로 쓰기" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
+      <button type="button" id="mic" aria-pressed="false" aria-label="말하기. 한 번 누르면 듣고, 다시 누르거나 말을 멈추면 보내요">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>
+        </svg>
+        <span id="micLabel" class="sr-only">말하기</span>
+      </button>
       <button type="submit">보내기</button>
     </form>
   </div>

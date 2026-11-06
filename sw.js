@@ -1,4 +1,4 @@
-var CACHE = "ko-en-teacher-shell-v2";
+var CACHE = "ko-en-teacher-shell-v3";
 var CORE = [
   "./",
   "./index.html",

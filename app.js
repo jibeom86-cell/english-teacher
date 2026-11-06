@@ -39,6 +39,7 @@
   var watchdog = null;
   var resumeTimer = null;
   var listenTimer = null;
+  var silenceTimer = null;
   var data = load();
 
   function emptyData() {
@@ -402,14 +403,27 @@
     try { old.abort(); } catch (error) {}
   }
 
+  function clearSilence() {
+    if (silenceTimer) {
+      clearTimeout(silenceTimer);
+      silenceTimer = null;
+    }
+  }
+
+  function setMicUi(on) {
+    micBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    micBtn.setAttribute("aria-label", on ? "듣는 중. 다시 누르면 보내요" : "말하기. 한 번 누르면 듣고, 다시 누르거나 말을 멈추면 보내요");
+    if (micLabel) micLabel.textContent = on ? "듣는 중" : "말하기";
+  }
+
   function releaseMic() {
     holding = false;
     committed = true;
     restartPending = false;
     clearListenTimer();
+    clearSilence();
     liveText = "";
-    micBtn.setAttribute("aria-pressed", "false");
-    micLabel.textContent = "누르고 말하기";
+    setMicUi(false);
     destroyRec();
   }
 
@@ -446,13 +460,13 @@
   function scheduleRestart() {
     if (!holding || committed || restartPending) return;
     if (restarts >= 4) {
-      giveUp("받아쓰기가 끊겼어요. 버튼을 누른 채로 다시 말해 주세요.", true);
+      giveUp("받아쓰기가 끊겼어요. 버튼을 한 번 더 누르고 말해 주세요.", false);
       return;
     }
     restartPending = true;
     var wait = [300, 1000, 2000, 3500][restarts] || 3500;
     restarts += 1;
-    micLabel.textContent = "다시 연결하고 있어요. 계속 누르고 말하세요.";
+    setStatus("다시 연결하고 있어요. 계속 말해 주세요.");
     clearListenTimer();
     listenTimer = setTimeout(function () {
       restartPending = false;
@@ -479,7 +493,7 @@
     recognition.continuous = true;
     recognition.maxAlternatives = 1;
     recognition.onstart = function () {
-      if (holding) micLabel.textContent = "듣는 중… 손을 떼면 보내요";
+      if (holding) setStatus("듣는 중… 말을 멈추거나 버튼을 다시 누르면 보내요.");
     };
     recognition.onresult = function (event) {
       if (committed) return;
@@ -494,6 +508,7 @@
       heardInterim = interim.trim();
       liveText = currentHeard();
       render();
+      if (currentHeard()) armSilence(1100);
     };
     recognition.onerror = function (event) {
       var code = event && event.error;
@@ -501,8 +516,8 @@
       if (code === "not-allowed" || code === "service-not-allowed") {
         if (!micPrimed) micDenied = true;
         giveUp(micPrimed
-          ? "받아쓰기를 지금 시작하지 못했어요. 버튼을 놓았다가 다시 누른 채로 말해 주세요."
-          : "마이크 권한이 필요해요. 설정에서 Safari 마이크를 허용한 뒤, 버튼을 다시 누르세요.", true);
+          ? "받아쓰기를 지금 시작하지 못했어요. 버튼을 다시 한 번 눌러 주세요."
+          : "마이크 권한이 필요해요. 설정에서 Safari 마이크를 허용한 뒤, 버튼을 다시 누르세요.", false);
         return;
       }
       if (holding) scheduleRestart();
@@ -510,6 +525,10 @@
     };
     recognition.onend = function () {
       if (committed) return;
+      if (holding && currentHeard()) {
+        armSilence(500);
+        return;
+      }
       if (holding) {
         scheduleRestart();
         return;
@@ -534,23 +553,44 @@
     if (committed) return;
     committed = true;
     clearListenTimer();
+    clearSilence();
     var text = currentHeard();
     holding = false;
-    micBtn.setAttribute("aria-pressed", "false");
-    micLabel.textContent = "누르고 말하기";
+    setMicUi(false);
     liveText = "";
     if (text) submitText(text);
     else {
       render();
-      setStatus("말이 안 들렸어요. 버튼을 누른 채로 다시 말해 주세요.");
+      setStatus("말이 안 들렸어요. 버튼을 한 번 더 누르고 말해 주세요.");
       speakNotice("말이 안 들렸어요. 버튼을 다시 누르고 말해 주세요.");
     }
+  }
+
+  function armSilence(wait) {
+    if (committed || !holding || !currentHeard()) return;
+    clearSilence();
+    silenceTimer = setTimeout(function () {
+      silenceTimer = null;
+      if (!holding || committed || !currentHeard()) return;
+      finishTalk();
+    }, wait);
   }
 
   function armCommit() {
     if (committed || holding) return;
     clearListenTimer();
     listenTimer = setTimeout(commitHeard, 700);
+  }
+
+  function finishTalk() {
+    if (committed) return;
+    holding = false;
+    clearSilence();
+    if (rec) {
+      try { rec.stop(); } catch (error) {}
+    }
+    if (currentHeard()) commitHeard();
+    else armCommit();
   }
 
   function startHold() {
@@ -581,38 +621,10 @@
     heardInterim = "";
     liveText = "";
     holding = true;
-    micBtn.setAttribute("aria-pressed", "true");
-    micLabel.textContent = "준비하고 있어요…";
-    setStatus("");
-    if (!micPrimed) {
-      primeMic().then(function (ok) {
-        if (!holding || committed) {
-          if (ok) speakNotice("마이크를 허용했어요. 버튼을 누른 채로 말해 주세요.");
-          return;
-        }
-        if (!ok) {
-          giveUp(micDenied
-            ? "마이크가 꺼져 있어요. 설정에서 Safari 마이크를 허용해 주세요."
-            : "마이크를 켜지 못했어요. 아래 칸에 한글로 쓸 수 있어요.", true);
-          return;
-        }
-        beginRecognition();
-      });
-      return;
-    }
+    setMicUi(true);
+    setStatus("듣는 중… 말을 멈추거나 버튼을 다시 누르면 보내요.");
+    if (!micPrimed) primeMic();
     beginRecognition();
-  }
-
-  function endHold() {
-    if (!holding) return;
-    holding = false;
-    micBtn.setAttribute("aria-pressed", "false");
-    micLabel.textContent = "누르고 말하기";
-    if (rec) {
-      try { rec.stop(); } catch (error) {}
-    }
-    if (currentHeard()) commitHeard();
-    else armCommit();
   }
 
   form.addEventListener("submit", function (event) {
@@ -620,29 +632,9 @@
     submitText(input.value);
   });
 
-  micBtn.addEventListener("pointerdown", function (event) {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    event.preventDefault();
-    suppressClick = true;
-    try { micBtn.setPointerCapture(event.pointerId); } catch (error) {}
-    startHold();
-  });
-
-  function finishPointer() {
-    if (holding) endHold();
-    setTimeout(function () { suppressClick = false; }, 400);
-  }
-
-  micBtn.addEventListener("pointerup", finishPointer);
-  micBtn.addEventListener("pointercancel", finishPointer);
   micBtn.addEventListener("contextmenu", function (event) { event.preventDefault(); });
-  micBtn.addEventListener("click", function (event) {
-    if (suppressClick) {
-      suppressClick = false;
-      event.preventDefault();
-      return;
-    }
-    if (holding) endHold();
+  micBtn.addEventListener("click", function () {
+    if (holding) finishTalk();
     else startHold();
   });
 

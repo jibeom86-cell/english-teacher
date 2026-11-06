@@ -226,6 +226,12 @@
   place("서울", "Seoul", { placePhrase: "in Seoul", toPhrase: "to Seoul", definite: "Seoul" });
   place("영화관", "movie theater", { placePhrase: "at the movie theater", toPhrase: "to the movie theater", definite: "the movie theater" });
   place("경찰서", "police station", { placePhrase: "at the police station", toPhrase: "to the police station", definite: "the police station" });
+  place("로비", "lobby", { placePhrase: "in the lobby", toPhrase: "to the lobby" });
+  place("엘리베이터", "elevator", { placePhrase: "at the elevator", toPhrase: "to the elevator" });
+  place("승강기", "elevator", { placePhrase: "at the elevator", toPhrase: "to the elevator" });
+  place("주차장", "parking lot", { placePhrase: "in the parking lot", toPhrase: "to the parking lot", definite: "the parking lot" });
+  place("현관", "entrance", { placePhrase: "at the entrance", toPhrase: "to the entrance" });
+  place("문", "door", { placePhrase: "at the door", toPhrase: "to the door" });
 
   noun("버스", { en: "bus", plural: "buses", kind: "vehicle", definite: "the bus", placePhrase: "on the bus", toPhrase: "to the bus", packed: "The bus is packed.", packedGloss: "버스에 사람이 꽉 찼어요.", counters: ["대"] });
   noun("지하철", { en: "subway", count: "mass", kind: "vehicle", definite: "the subway", placePhrase: "on the subway", toPhrase: "to the subway" });
@@ -1650,8 +1656,225 @@
     }, mem, parsed.name ? { name: parsed.name } : {});
   }
 
+  function deliveryResult(standard, casual, g1, g2) {
+    if (!validEnglish(standard) || !validEnglish(casual)) return null;
+    return { situation: "street", standard: standard, casual: casual, glossStandard: g1, glossCasual: g2 };
+  }
+
+  function prepDelivery(text) {
+    return text
+      .replace(/조금/g, "\u0001")
+      .replace(/한번/g, "")
+      .replace(/좀/g, "")
+      .replace(/\u0001/g, "조금")
+      .replace(/와주세요$/, "오세요")
+      .replace(/와줘요$/, "오세요")
+      .replace(/와줘$/, "오세요")
+      .replace(/내려와요$/, "내려오세요")
+      .replace(/내려오십시오$/, "내려오세요")
+      .replace(/올라와요$/, "올라오세요")
+      .replace(/올라오십시오$/, "올라오세요")
+      .replace(/가주세요$/, "가세요")
+      .replace(/가줘요$/, "가세요")
+      .replace(/가줘$/, "가세요")
+      .replace(/가십시오$/, "가세요")
+      .replace(/오십시오$/, "오세요")
+      .replace(/갈께요$/, "갈게요")
+      .replace(/올께요$/, "올게요")
+      .replace(/둘께요$/, "둘게요")
+      .replace(/놓아둘게요$/, "놔둘게요")
+      .replace(/놓아주세요$/, "놔주세요")
+      .replace(/놔둬주세요$/, "놔주세요")
+      .replace(/둬주세요$/, "두세요")
+      .replace(/두고가주세요$/, "두고가세요")
+      .replace(/열어줘요$/, "열어주세요")
+      .replace(/열어줘$/, "열어주세요")
+      .replace(/여세요$/, "열어주세요")
+      .replace(/눌러줘요$/, "눌러주세요")
+      .replace(/눌러줘$/, "눌러주세요")
+      .replace(/누르세요$/, "눌러주세요")
+      .replace(/했습니다$/, "했어요")
+      .replace(/왔습니다$/, "왔어요");
+  }
+
+  var DELIVERY_ACTIONS = {
+    "내려오세요": "come-down",
+    "내려가세요": "go-down",
+    "올라오세요": "come-up",
+    "올라가세요": "go-up",
+    "오세요": "come",
+    "가세요": "go",
+    "내려올게요": "will-come-down",
+    "내려갈게요": "will-go-down",
+    "내려갈거예요": "will-go-down",
+    "올라올게요": "will-come-up",
+    "올라갈게요": "will-go-up",
+    "올라갈거예요": "will-go-up",
+    "올게요": "will-come",
+    "갈게요": "will-go",
+    "갈거예요": "will-go",
+    "가요": "going",
+    "안가요": "not-going",
+    "있어요": "be",
+    "없어요": "away",
+    "도착했어요": "arrived",
+    "왔어요": "arrived",
+    "다왔어요": "arrived",
+    "둘게요": "will-leave",
+    "놔둘게요": "will-leave",
+    "두고갈게요": "will-leave",
+    "놔주세요": "leave",
+    "두세요": "leave",
+    "두고가세요": "leave",
+    "놔두세요": "leave",
+    "열어주세요": "open",
+    "열게요": "will-open",
+    "고장났어요": "broken",
+    "고장이났어요": "broken",
+    "고장이에요": "broken",
+    "안돼요": "dead",
+    "멈춰요": "stuck",
+    "멈췄어요": "stuck"
+  };
+
+  var DELIVERY_SPOTS = [
+    { ko: "지하주차장", name: "the underground parking lot", at: "in the underground parking lot", to: "to the underground parking lot", by: "in the underground parking lot" },
+    { ko: "주차장", name: "the parking lot", at: "in the parking lot", to: "to the parking lot", by: "in the parking lot", casualBe: "I'm in the lot." },
+    { ko: "공동현관", name: "the building entrance", at: "at the building entrance", to: "to the building entrance", by: "by the building entrance", door: true },
+    { ko: "현관문", name: "the front door", at: "at the front door", to: "to the front door", by: "by the front door", door: true },
+    { ko: "엘리베이터", name: "the elevator", at: "at the elevator", to: "to the elevator", by: "by the elevator", elevator: true },
+    { ko: "승강기", name: "the elevator", at: "at the elevator", to: "to the elevator", by: "by the elevator", elevator: true },
+    { ko: "로비", name: "the lobby", at: "in the lobby", to: "to the lobby", by: "in the lobby", casualBe: "I'm down in the lobby." },
+    { ko: "문앞", name: "the door", at: "at the door", to: "to the door", by: "by the door", door: true },
+    { ko: "현관", name: "the entrance", at: "at the entrance", to: "to the entrance", by: "by the entrance", door: true },
+    { ko: "문", name: "the door", at: "at the door", to: "to the door", by: "by the door", door: true, casualBe: "I'm right outside." }
+  ];
+
+  var FLOOR_WORDS = { "한": 1, "일": 1, "두": 2, "이": 2, "세": 3, "삼": 3, "네": 4, "사": 4, "다섯": 5, "오": 5, "여섯": 6, "육": 6, "일곱": 7, "칠": 7, "여덟": 8, "팔": 8, "아홉": 9, "구": 9, "열": 10, "십": 10 };
+  var ORDINALS = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+
+  function floorSpot(basement, n) {
+    if (basement && n === 1) {
+      return { ko: "지하", name: "the basement", at: "in the basement", to: "to the basement", by: "in the basement", casualBe: "I'm in the basement." };
+    }
+    if (basement) {
+      return { ko: "지하", name: "basement level " + n, at: "on basement level " + n, to: "to basement level " + n, by: "on basement level " + n, casualBe: "Basement level " + n + "." };
+    }
+    if (n === 1) {
+      return { ko: "1층", name: "the first floor", at: "on the first floor", to: "to the first floor", by: "on the first floor", casualBe: "I'm downstairs." };
+    }
+    if (ORDINALS[n]) {
+      return { ko: n + "층", name: "the " + ORDINALS[n] + " floor", at: "on the " + ORDINALS[n] + " floor", to: "to the " + ORDINALS[n] + " floor", by: "on the " + ORDINALS[n] + " floor", casualBe: cap(ORDINALS[n]) + " floor." };
+    }
+    return { ko: n + "층", name: "floor " + n, at: "on floor " + n, to: "to floor " + n, by: "on floor " + n, casualBe: "Floor " + n + "." };
+  }
+
+  function takeDeliverySpot(text) {
+    var floor = text.match(/^(지하)?(\d{1,2}|열|십|다섯|여섯|일곱|여덟|아홉|한|일|두|이|세|삼|네|사|오|육|칠|팔|구)층(.*)$/);
+    if (floor) {
+      var n = FLOOR_WORDS[floor[2]] || Number(floor[2]);
+      if (n >= 1 && n <= 60) return { spot: floorSpot(!!floor[1], n), rest: floor[3] };
+    }
+    for (var i = 0; i < DELIVERY_SPOTS.length; i++) {
+      var spot = DELIVERY_SPOTS[i];
+      if (text.indexOf(spot.ko) === 0 && text.length > spot.ko.length) return { spot: spot, rest: text.slice(spot.ko.length) };
+    }
+    return null;
+  }
+
+  function stripDeliveryParticle(rest) {
+    var particles = ["으로", "에서", "까지", "앞에", "에게", "한테", "에는", "에도", "에", "로", "은", "는", "이", "가", "을", "를"];
+    for (var i = 0; i < particles.length; i++) {
+      var particle = particles[i];
+      if (rest.indexOf(particle) === 0 && rest.length > particle.length) {
+        var next = rest.slice(particle.length);
+        if (DELIVERY_ACTIONS[next]) return next;
+      }
+    }
+    return rest;
+  }
+
+  function deliveryMove(kind, spot) {
+    var to = spot.to;
+    var at = spot.at;
+    var by = spot.by || at;
+    var where = spot.ko;
+    if (kind === "come-down") return deliveryResult("Please come down " + to + ".", "Can you come down " + to + "?", where + "로 내려오라는 말이에요.", "부탁처럼 말한 거예요.");
+    if (kind === "go-down") return deliveryResult("Please go down " + to + ".", "Can you go down " + to + "?", where + "로 내려가라는 말이에요.", "부탁처럼 말한 거예요.");
+    if (kind === "come-up") return deliveryResult("Please come up " + to + ".", "Can you come up " + to + "?", where + "로 올라오라는 말이에요.", "부탁처럼 말한 거예요.");
+    if (kind === "go-up") return deliveryResult("Please go up " + to + ".", "Can you go up " + to + "?", where + "로 올라가라는 말이에요.", "부탁처럼 말한 거예요.");
+    if (kind === "come") return deliveryResult("Please come " + to + ".", "Can you come " + to + "?", where + "로 오라는 말이에요.", "부탁처럼 말한 거예요.");
+    if (kind === "go") return deliveryResult("Please go " + to + ".", "Can you go " + to + "?", where + "로 가라는 말이에요.", "부탁처럼 말한 거예요.");
+    if (kind === "will-come-down") return deliveryResult("I'll come down " + to + ".", "I'm coming down " + to + ".", where + "로 내려온다는 말이에요.", "지금 내려온다는 말이에요.");
+    if (kind === "will-go-down") return deliveryResult("I'll go down " + to + ".", "I'm heading down " + to + ".", where + "로 내려간다는 말이에요.", "짧게 말한 거예요.");
+    if (kind === "will-come-up") return deliveryResult("I'll come up " + to + ".", "I'm coming up " + to + ".", where + "로 올라온다는 말이에요.", "지금 올라온다는 말이에요.");
+    if (kind === "will-go-up") return deliveryResult("I'll go up " + to + ".", "I'm heading up " + to + ".", where + "로 올라간다는 말이에요.", "짧게 말한 거예요.");
+    if (kind === "will-come") return deliveryResult("I'll come " + to + ".", "I'm coming " + to + ".", where + "로 온다는 말이에요.", "짧게 말한 거예요.");
+    if (kind === "will-go") return deliveryResult("I'll go " + to + ".", "I'm heading " + to + ".", where + "로 간다는 말이에요.", "짧게 말한 거예요.");
+    if (kind === "going") return deliveryResult("I'm going " + to + ".", "I'm heading " + to + ".", where + "로 가는 중이에요.", "heading은 간다는 편한 말이에요.");
+    if (kind === "not-going") return deliveryResult("I'm not going " + to + ".", "I'm not heading " + to + ".", where + "로 안 간다는 말이에요.", "안 간다는 짧은 말이에요.");
+    if (kind === "be") return deliveryResult("I'm " + at + ".", spot.casualBe || ("I'm here, " + at + "."), where + "에 있다는 말이에요.", "짧게 말한 거예요.");
+    if (kind === "away" && spot.elevator) return deliveryResult("There is no elevator.", "There's no elevator.", "엘리베이터가 없다는 말이에요.", "없다는 짧은 말이에요.");
+    if (kind === "away") return deliveryResult("I'm not " + at + ".", "I'm not there.", where + "에 없다는 말이에요.", "거기 없다는 짧은 말이에요.");
+    if (kind === "arrived") return deliveryResult("I've arrived " + at + ".", "I'm here.", where + "에 도착했다는 말이에요.", "왔다는 짧은 말이에요.");
+    if (kind === "will-leave") return deliveryResult("I'll leave it " + at + ".", "I'll just leave it " + by + ".", where + "에 둔다는 말이에요.", "두고 간다는 말이에요.");
+    if (kind === "leave") return deliveryResult("Please leave it " + at + ".", "Just leave it " + by + ".", where + "에 두라는 말이에요.", "짧게 부탁하는 말이에요.");
+    if (kind === "open" && spot.door) return deliveryResult("Please open " + spot.name + ".", "Can you open " + spot.name + "?", "문을 열어 달라는 말이에요.", "열어 달라는 부탁이에요.");
+    if (kind === "will-open" && spot.door) return deliveryResult("I'll open " + spot.name + ".", "I'm opening " + spot.name + ".", "문을 연다는 말이에요.", "지금 연다는 말이에요.");
+    if (kind === "broken" && spot.elevator) return deliveryResult("The elevator is out of order.", "The elevator's down.", "엘리베이터가 고장 났다는 말이에요.", "안 된다는 편한 말이에요.");
+    if (kind === "dead" && spot.elevator) return deliveryResult("The elevator isn't working.", "The elevator's down.", "엘리베이터가 안 된다는 말이에요.", "안 된다는 편한 말이에요.");
+    if (kind === "stuck" && spot.elevator) return deliveryResult("The elevator is stuck.", "The elevator's stuck.", "엘리베이터가 멈췄다는 말이에요.", "멈췄다는 짧은 말이에요.");
+    return null;
+  }
+
+  function parseDelivery(text) {
+    var s = prepDelivery(text);
+    if (s === "몇층이에요" || s === "몇층이세요" || s === "몇층인가요" || s === "몇층이죠" || s === "몇층이야" || s === "몇층입니까" || s === "몇층요") {
+      return deliveryResult("Which floor is it?", "What floor?", "몇 층인지 물어요.", "짧게 물은 거예요.");
+    }
+    if (s === "어디세요" || s === "어디계세요" || s === "지금어디세요" || s === "지금어디예요" || s === "어디에계세요") {
+      return deliveryResult("Where are you?", "Hey, where are you?", "어디 있는지 물어요.", "앞에 hey를 붙여요.");
+    }
+    if (s === "도착했어요" || s === "도착했습니다" || s === "다왔어요" || s === "나왔어요" || s === "저왔어요" || s === "저도착했어요") {
+      return deliveryResult("I've arrived.", "I'm here.", "도착했다는 말이에요.", "왔다는 짧은 말이에요.");
+    }
+    if (s === "왔어요") return deliveryResult("I'm here.", "I just got here.", "왔다는 말이에요.", "방금 왔다는 말이에요.");
+    if (s === "초인종눌러주세요" || s === "벨눌러주세요" || s === "초인종눌러요") {
+      return deliveryResult("Please ring the doorbell.", "Just ring the bell.", "초인종을 눌러 달라는 말이에요.", "짧게 부탁하는 말이에요.");
+    }
+    if (s === "초인종누를게요" || s === "벨누를게요") {
+      return deliveryResult("I'll ring the doorbell.", "I'll ring the bell.", "초인종을 누른다는 말이에요.", "짧게 말한 거예요.");
+    }
+    if (s === "공동현관비밀번호알려주세요" || s === "공동현관비밀번호말해주세요" || s === "공동현관비밀번호뭐예요" || s === "공동현관비밀번호") {
+      return deliveryResult("Please give me the building door code.", "What's the building door code?", "공동현관 비밀번호를 묻는 말이에요.", "질문으로 묻는 말이에요.");
+    }
+    if (s === "현관비밀번호알려주세요" || s === "현관비밀번호말해주세요" || s === "현관문비밀번호알려주세요" || s === "현관비밀번호뭐예요" || s === "현관비밀번호") {
+      return deliveryResult("Please give me the entrance code.", "What's the entrance code?", "현관 비밀번호를 묻는 말이에요.", "질문으로 묻는 말이에요.");
+    }
+    if (s === "비밀번호알려주세요" || s === "비밀번호말해주세요" || s === "비밀번호뭐예요") {
+      return deliveryResult("Please tell me the password.", "What's the password?", "비밀번호를 묻는 말이에요.", "질문으로 묻는 말이에요.");
+    }
+    var bare = {
+      "내려오세요": ["Please come down.", "Can you come down?", "내려오라는 말이에요.", "부탁처럼 말한 거예요."],
+      "내려가세요": ["Please go down.", "Can you go down?", "내려가라는 말이에요.", "부탁처럼 말한 거예요."],
+      "올라오세요": ["Please come up.", "Can you come up?", "올라오라는 말이에요.", "부탁처럼 말한 거예요."],
+      "올라가세요": ["Please go up.", "Can you go up?", "올라가라는 말이에요.", "부탁처럼 말한 거예요."],
+      "내려올게요": ["I'll come down.", "I'm coming down.", "내려온다는 말이에요.", "지금 내려온다는 말이에요."],
+      "내려갈게요": ["I'll go down.", "I'm heading down.", "내려간다는 말이에요.", "짧게 말한 거예요."],
+      "올라올게요": ["I'll come up.", "I'm coming up.", "올라온다는 말이에요.", "지금 올라온다는 말이에요."],
+      "올라갈게요": ["I'll go up.", "I'm heading up.", "올라간다는 말이에요.", "짧게 말한 거예요."],
+      "올라갈거예요": ["I'll go up.", "I'm heading up.", "올라간다는 말이에요.", "짧게 말한 거예요."]
+    };
+    if (bare[s]) return deliveryResult(bare[s][0], bare[s][1], bare[s][2], bare[s][3]);
+    var found = takeDeliverySpot(s);
+    if (!found) return null;
+    var action = DELIVERY_ACTIONS[stripDeliveryParticle(found.rest)];
+    if (!action) return null;
+    return deliveryMove(action, found.spot);
+  }
+
   function parseCore(core) {
-    return parseTime(core) || parseWhere(core) || parsePrice(core) || parseOrder(core) || parseWant(core) || parseRide(core) || parseConsume(core) || parseGo(core) || parseAdjective(core) || parseLike(core) || parseExistence(core) || parseName(core);
+    return parseDelivery(core) || parseTime(core) || parseWhere(core) || parsePrice(core) || parseOrder(core) || parseWant(core) || parseRide(core) || parseConsume(core) || parseGo(core) || parseAdjective(core) || parseLike(core) || parseExistence(core) || parseName(core);
   }
 
   function reply(raw, memory) {
