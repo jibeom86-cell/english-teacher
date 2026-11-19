@@ -17,16 +17,31 @@
   <div class="phone">
     <header class="top">
       <div>
-        <p class="eyebrow">한국어로 묻고, 영어로 말하기</p>
+        <p class="eyebrow">말하면 영어로 들려줘요</p>
         <h1>영어 선생님</h1>
       </div>
       <button type="button" id="clearBtn">지우기</button>
     </header>
+    <p class="wake-note">화면이 켜져 있고 이 페이지가 보일 때만 “선생님”이라고 하면 들어요. 잠금 화면에서는 안 돼요.</p>
+    <section id="setup" class="setup" hidden>
+      <p class="setup-kicker">처음 한 번, 목소리를 맞출게요</p>
+      <p id="setupCount" class="setup-count"></p>
+      <p id="setupLine" class="setup-line"></p>
+      <p id="setupHint" class="setup-hint"></p>
+      <button type="button" id="setupSkip">이 문장 건너뛰기</button>
+    </section>
     <main id="log"></main>
+    <details id="settings" class="settings">
+      <summary>설정</summary>
+      <label for="apiKey">열쇠</label>
+      <input id="apiKey" type="password" autocomplete="new-password" placeholder="비워 두세요. 없어도 돼요." spellcheck="false">
+      <p class="hint">열쇠는 저장만 하고 어디로도 보내지 않아요. 비어 있어도 이 폰에서 동작해요.</p>
+      <button type="button" id="redoVoice">발음 다시 맞추기</button>
+    </details>
     <p id="status" class="status" role="status"></p>
     <form id="form">
-      <label class="sr-only" for="input">한국어 입력</label>
-      <input id="input" type="text" inputmode="text" placeholder="한국어로 쓰기" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
+      <label class="sr-only" for="input">말하기 또는 쓰기</label>
+      <input id="input" type="text" inputmode="text" placeholder="한국어나 영어로 쓰기" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
       <button type="button" id="mic" aria-pressed="false" aria-label="말하기. 한 번 누르면 듣고, 다시 누르거나 말을 멈추면 보내요">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>

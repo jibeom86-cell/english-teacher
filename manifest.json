@@ -1,7 +1,7 @@
 {
   "name": "영어 선생님",
   "short_name": "영어 선생님",
-  "description": "한국어로 물으면 짧은 영어 문장을 알려 줍니다.",
+  "description": "배달할 때 한국어로 말하면 영어를 들려주는 선생님입니다.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
