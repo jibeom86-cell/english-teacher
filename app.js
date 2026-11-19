@@ -27,8 +27,12 @@
   var primePromise = null;
   var heardFinal = "";
   var heardInterim = "";
+  var kept = "";
+  var emptyStreak = 0;
   var restarts = 0;
   var restartPending = false;
+  var restartTimer = null;
+  var idleTimer = null;
   var liveText = "";
   var queue = [];
   var speakGen = 0;
@@ -200,19 +204,7 @@
   function captureSetup(text) {
     var steps = engine.setupSteps;
     var step = steps[setupIndex];
-    if (!text) {
-      setupMiss += 1;
-      if (setupMiss >= 2) {
-        setupMiss = 0;
-        setupIndex += 1;
-        if (setupIndex >= steps.length) finishSetup();
-        else showSetup();
-        return;
-      }
-      setStatus("한 번 더 읽어 주세요.");
-      speakChunks([{ text: "잘 안 들렸어요. 같은 문장을 한 번 더 읽어 주세요.", lang: "ko-KR", rate: 0.95 }]);
-      return;
-    }
+    if (!text) return;
     data.aliases = engine.learn(text, step.id, step.lang, { aliases: data.aliases });
     data.profile.samples.push({ id: step.id, lang: step.lang, show: step.show, heard: text });
     save();
@@ -231,11 +223,7 @@
 
   function submitText(text) {
     var clean = String(text || "").replace(/^\s*선생님\s*/, "").trim();
-    if (!clean) {
-      setStatus("말이 안 들렸어요. 버튼을 한 번 더 눌러 주세요.");
-      speakChunks([{ text: "말이 안 들렸어요. 버튼을 한 번 더 눌러 주세요.", lang: "ko-KR", rate: 0.95 }]);
-      return;
-    }
+    if (!clean) return;
     if (!engine) {
       setStatus("선생님 파일을 불러오지 못했어요.");
       return;
@@ -404,18 +392,69 @@
     if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
   }
 
-  function currentHeard() {
+  function clearRestart() {
+    if (restartTimer) { clearTimeout(restartTimer); restartTimer = null; }
+    restartPending = false;
+  }
+
+  function clearIdle() {
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+  }
+
+  function livePiece() {
     return (heardFinal + " " + heardInterim).replace(/\s+/g, " ").trim();
   }
 
-  function destroyRec() {
-    clearSilence();
-    restartPending = false;
+  function currentHeard() {
+    return (kept + " " + livePiece()).replace(/\s+/g, " ").trim();
+  }
+
+  function rememberLive() {
+    var piece = livePiece();
+    heardFinal = "";
+    heardInterim = "";
+    if (!piece) return;
+    if (!kept || piece.indexOf(kept) === 0) kept = piece;
+    else if (kept.slice(-piece.length) !== piece) kept = (kept + " " + piece).replace(/\s+/g, " ").trim();
+  }
+
+  function detachRec() {
     if (!rec) return;
     var old = rec;
     rec = null;
     try { old.onstart = null; old.onresult = null; old.onerror = null; old.onend = null; } catch (error) {}
     try { old.abort(); } catch (error) {}
+  }
+
+  function destroyRec() {
+    clearSilence();
+    clearRestart();
+    clearIdle();
+    detachRec();
+  }
+
+  function missListen() {
+    emptyStreak += 1;
+    mode = "off";
+    setMicUi(false);
+    kept = "";
+    heardFinal = "";
+    heardInterim = "";
+    liveText = "";
+    destroyRec();
+    if (emptyStreak === 1) {
+      setStatus("말이 안 들렸어요.");
+      speakChunks([{ text: "말이 안 들렸어요.", lang: "ko-KR", rate: 0.95 }]);
+      return;
+    }
+    if (emptyStreak === 2) {
+      var tip = "마이크를 한 번 누르고, 짧은 문장으로 말해 주세요.";
+      setStatus(tip);
+      speakChunks([{ text: tip, lang: "ko-KR", rate: 0.95 }]);
+      return;
+    }
+    setStatus("마이크를 한 번 누르고, 짧은 문장으로 말해 주세요.");
+    startWake();
   }
 
   function primeMic() {
@@ -438,13 +477,26 @@
 
   function handleHeard(text) {
     var heardMode = mode;
+    var clean = String(text || "").replace(/\s+/g, " ").trim();
     mode = "off";
     setMicUi(false);
     liveText = "";
+    kept = "";
+    heardFinal = "";
+    heardInterim = "";
     destroyRec();
-    if (heardMode === "setup" || inSetup()) captureSetup(text);
-    else if (heardMode === "wake") takeWake(text);
-    else submitText(text);
+    if (!clean) {
+      if (heardMode === "wake") {
+        startWake();
+        return;
+      }
+      missListen();
+      return;
+    }
+    emptyStreak = 0;
+    if (heardMode === "setup" || (heardMode !== "wake" && inSetup())) captureSetup(clean);
+    else if (heardMode === "wake") takeWake(clean);
+    else submitText(clean);
   }
 
   function takeWake(text) {
@@ -458,6 +510,11 @@
       return;
     }
     submitText(rest);
+  }
+
+  function ensureSilence(wait, wake) {
+    if (silenceTimer) return;
+    armSilence(wait, wake);
   }
 
   function armSilence(wait, wake) {
@@ -474,6 +531,16 @@
       if (!text) return;
       handleHeard(text);
     }, wait);
+  }
+
+  function armIdle() {
+    clearIdle();
+    idleTimer = setTimeout(function () {
+      idleTimer = null;
+      if (mode !== "talk" && mode !== "setup") return;
+      if (currentHeard()) return;
+      missListen();
+    }, 8000);
   }
 
   function buildRec(kind) {
@@ -497,9 +564,11 @@
       }
       heardFinal = finalText.trim();
       heardInterim = interim.trim();
+      if (kept && heardFinal.indexOf(kept) === 0) kept = "";
       liveText = currentHeard();
       if (kind !== "wake") render();
       if (!liveText) return;
+      clearIdle();
       if (kind === "wake") {
         if (liveText.indexOf("선생님") !== -1) armSilence(700, true);
         return;
@@ -508,7 +577,11 @@
     };
     recognition.onerror = function (event) {
       var code = event && event.error;
-      if (!code || code === "aborted" || code === "no-speech") return;
+      if (!code || code === "aborted") return;
+      if (code === "no-speech") {
+        if (mode === kind) scheduleRestart(kind);
+        return;
+      }
       if (code === "not-allowed" || code === "service-not-allowed") {
         if (!micPrimed) micDenied = true;
         mode = "off";
@@ -521,14 +594,14 @@
     };
     recognition.onend = function () {
       if (mode !== kind) return;
-      if ((kind === "talk" || kind === "setup") && currentHeard()) {
-        armSilence(400, false);
+      rememberLive();
+      liveText = currentHeard();
+      if (kind === "wake") {
+        if (currentHeard().indexOf("선생님") !== -1) ensureSilence(400, true);
+        scheduleRestart(kind);
         return;
       }
-      if (kind === "wake" && currentHeard().indexOf("선생님") !== -1) {
-        armSilence(300, true);
-        return;
-      }
+      if (currentHeard()) ensureSilence(1100, false);
       scheduleRestart(kind);
     };
     return recognition;
@@ -536,31 +609,26 @@
 
   function scheduleRestart(kind) {
     if (mode !== kind || restartPending) return;
-    if (restarts >= 6) {
+    if (kind === "wake" && restarts >= 12) {
       mode = "off";
-      setMicUi(false);
-      if (kind === "wake") {
-        setStatus("‘선생님’ 듣기가 끊겼어요. 화면을 한 번 누르면 다시 들어요.");
-        return;
-      }
-      setStatus("받아쓰기가 끊겼어요. 버튼을 한 번 더 눌러 주세요.");
+      detachRec();
+      setStatus("‘선생님’ 듣기가 끊겼어요. 화면을 한 번 누르면 다시 들어요.");
       return;
     }
     restartPending = true;
-    var wait = [250, 600, 1200, 2000, 3000, 3000][restarts] || 3000;
     restarts += 1;
-    clearSilence();
-    silenceTimer = setTimeout(function () {
+    var wait = kind === "wake" ? Math.min(1500, 200 + restarts * 100) : 160;
+    restartTimer = setTimeout(function () {
+      restartTimer = null;
       restartPending = false;
-      silenceTimer = null;
       if (mode !== kind) return;
+      detachRec();
       try {
-        if (!rec) rec = buildRec(kind);
+        rec = buildRec(kind);
         rec.start();
       } catch (error) {
-        destroyRec();
-        mode = kind;
-        try { rec = buildRec(kind); rec.start(); } catch (again) { scheduleRestart(kind); }
+        detachRec();
+        scheduleRestart(kind);
       }
     }, wait);
   }
@@ -576,12 +644,16 @@
       return;
     }
     destroyRec();
+    kept = "";
     heardFinal = "";
     heardInterim = "";
     liveText = "";
     restarts = 0;
     mode = kind;
-    if (kind !== "wake") setMicUi(true);
+    if (kind !== "wake") {
+      setMicUi(true);
+      armIdle();
+    }
     rec = buildRec(kind);
     try { rec.start(); } catch (error) { scheduleRestart(kind); }
   }
@@ -601,8 +673,8 @@
 
   function finishListen() {
     if (mode !== "talk" && mode !== "setup") return;
-    var text = currentHeard();
-    handleHeard(text);
+    rememberLive();
+    handleHeard(currentHeard());
   }
 
   form.addEventListener("submit", function (event) {
