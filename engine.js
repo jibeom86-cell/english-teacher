@@ -622,30 +622,114 @@
     return { phrase: best.phrase, via: best.via === "ko" ? "ko" : "konglish" };
   }
 
-  function fromPhrase(phrase, via) {
-    var spoken = via === "konglish" || via === "alias-en" || via === "en-fuzzy";
-    var exactEn = via === "en";
-    if (!validEnglish(phrase.standard) || !validEnglish(phrase.casual)) return null;
-    if (spoken) {
-      return {
-        kind: "coach",
-        phraseId: phrase.id,
-        learnLang: "en",
-        leadKo: "발음만 조금 고치면 돼요.",
-        glossStandard: phrase.gloss,
-        glossCasual: phrase.casualGloss,
-        standard: phrase.standard,
-        casual: phrase.casual,
-        coachKo: phrase.coach,
-        soundKo: phrase.sound,
-        slow: true
-      };
+  function pack3(standard, casual, gloss) {
+    return [standard, casual, gloss];
+  }
+
+  var NEXT = {
+    "greet-hello": { mode: "chat", answer: pack3("Hello. Nice to meet you.", "Hey. Good to see you.", "안녕하세요. 만나서 반가워요.") },
+    "greet-thanks": { mode: "chat", answer: pack3("You're welcome.", "No worries.", "천만에요, 괜찮아요.") },
+    "greet-sorry": { mode: "chat", answer: pack3("It's okay.", "No worries.", "괜찮다고 받아 줘요.") },
+    "greet-yes": { mode: "chat", answer: pack3("Okay. What do you need?", "Yeah. What's up?", "알겠어요. 뭐가 필요하냐고 물어요.") },
+    "greet-no": { mode: "chat", answer: pack3("All right. What should we change?", "Okay. What else?", "알겠어요. 뭘 바꿀지 물어요.") },
+    "greet-ok": { mode: "chat", answer: pack3("Good. Let's keep going.", "Cool. What's next?", "좋아요. 다음을 물어요.") },
+    "daily-wait": { mode: "chat", answer: pack3("Sure. Take your time.", "No rush.", "천천히 해도 된다고 해요.") },
+    "daily-english": { mode: "chat", answer: pack3("That's okay. We'll go slowly.", "No worries. Short sentences are fine.", "괜찮아요. 짧은 문장으로 하자고 해요.") },
+    "daily-again": { mode: "say", answer: pack3("Sure. I'll say it again.", "Okay. One more time.", "네, 다시 말할게요."), follow: pack3("Could you say that again?", "One more time, please?", "한 번 더 말해 달라는 말이에요.") },
+    "daily-slow": { mode: "say", answer: pack3("Sure. I'll speak slowly.", "Okay. Slower.", "네, 천천히 말할게요."), follow: pack3("Could you speak slowly?", "A little slower, please?", "천천히 말해 달라는 말이에요.") },
+    "daily-help": { mode: "chat", answer: pack3("Sure. What do you need?", "Yeah. How can I help?", "네, 뭐가 필요하냐고 물어요.") },
+    "arrive": { mode: "chat", answer: pack3("Okay. I'll come down.", "Got it. I'm coming down.", "알겠어요. 내려갈게요.") },
+    "coming": { mode: "chat", answer: pack3("Thanks. I'll wait here.", "Okay. I'll be here.", "고마워요. 여기서 기다릴게요.") },
+    "where-you": { mode: "chat", answer: pack3("I'm right here.", "I'm outside.", "저 여기 있어요. 밖에 있어요.") },
+    "which-floor": { mode: "say", answer: pack3("I'm on the first floor.", "First floor.", "1층이에요."), follow: pack3("Which floor is it?", "What floor?", "몇 층이냐고 묻는 말이에요.") },
+    "doorbell": { mode: "say", answer: pack3("Okay. I'll ring the bell.", "Sure. I'll ring it.", "네, 초인종 누를게요."), follow: pack3("Please ring the doorbell.", "Just ring the bell.", "초인종을 눌러 달라는 말이에요.") },
+    "elevator-down": { mode: "say", answer: pack3("Okay. I'll take the stairs.", "Got it. I'll use the stairs.", "알겠어요. 계단으로 갈게요."), follow: pack3("Please use the stairs.", "Just take the stairs.", "계단을 이용해 달라는 말이에요.") },
+    "no-elevator": { mode: "say", answer: pack3("Okay. I'll take the stairs.", "Got it. I'll use the stairs.", "알겠어요. 계단으로 갈게요."), follow: pack3("There is no elevator.", "There's no elevator.", "엘리베이터가 없다는 말이에요.") },
+    "building-code": { mode: "say", answer: pack3("Sorry. I don't have the code.", "I don't know the code.", "비밀번호는 모른다고 해요."), follow: pack3("Please give me the building door code.", "What's the building door code?", "공동현관 비밀번호를 묻는 말이에요.") },
+    "entrance-code": { mode: "say", answer: pack3("Sorry. I don't have the code.", "I don't know the code.", "비밀번호는 모른다고 해요."), follow: pack3("Please give me the entrance code.", "What's the entrance code?", "현관 비밀번호를 묻는 말이에요.") },
+    "password": { mode: "say", answer: pack3("Sorry. I don't have the code.", "I don't know the code.", "비밀번호는 모른다고 해요."), follow: pack3("Please tell me the password.", "What's the password?", "비밀번호를 묻는 말이에요.") },
+    "open-door": { mode: "say", answer: pack3("Sure. I'll open the door.", "Okay. One second.", "네, 문 열게요."), follow: pack3("Please open the door.", "Can you open the door?", "문을 열어 달라는 말이에요.") },
+    "come-down": { mode: "say", answer: pack3("Okay. I'm coming down.", "Got it. On my way.", "알겠어요. 내려갈게요."), follow: pack3("Which floor are you on?", "What floor?", "이어서 몇 층이냐고 물어요.") },
+    "go-up": { mode: "say", answer: pack3("Okay. I'm coming up.", "Got it. On my way up.", "알겠어요. 올라갈게요."), follow: pack3("What floor is it?", "Which floor?", "몇 층이냐고 물어요.") },
+    "come-up": { mode: "say", answer: pack3("Okay. I'm coming up.", "Got it. On my way up.", "알겠어요. 올라갈게요."), follow: pack3("What floor is it?", "Which floor?", "몇 층이냐고 물어요.") },
+    "will-up": { mode: "chat", answer: pack3("Thanks. I'll wait.", "Okay. I'll be here.", "고마워요. 기다릴게요.") },
+    "will-down": { mode: "chat", answer: pack3("Thanks. I'll meet you down there.", "Okay. See you downstairs.", "고마워요. 아래에서 만나요.") },
+    "leave-door": { mode: "say", answer: pack3("Okay. I'll grab it.", "Got it. I'll pick it up.", "알겠어요. 가져갈게요."), follow: pack3("Please take it when you can.", "Grab it when you're free.", "시간 될 때 가져가 달라는 말이에요.") },
+    "leave-please": { mode: "say", answer: pack3("Okay. I'll grab it.", "Got it. I'll pick it up.", "알겠어요. 가져갈게요."), follow: pack3("Please leave it at the door.", "Just leave it by the door.", "문 앞에 두라는 말이에요.") },
+    "lobby-down": { mode: "say", answer: pack3("Okay. I'm coming down.", "Got it. On my way.", "알겠어요. 내려갈게요."), follow: pack3("Which floor are you on?", "What floor?", "이어서 몇 층이냐고 물어요.") }
+  };
+
+  var CHATS = [
+    { keys: ["힘들어요", "피곤해요", "지쳤어요", "힘들다"], standard: "That sounds tough. Are you okay?", gloss: "힘들겠네요. 괜찮아요?" },
+    { keys: ["배고파요", "배고프다", "밥먹어야해요"], standard: "You must be hungry. Eat when you can.", gloss: "배고프겠네요. 시간 될 때 먹어요." },
+    { keys: ["모르겠어요", "모르겠어", "잘모르겠어요"], standard: "That's okay. Let's try a short sentence.", gloss: "괜찮아요. 짧은 문장으로 해 봐요." },
+    { keys: ["좋아요", "좋네요", "괜찮아요", "괜찮습니다", "좋습니다"], standard: "I'm glad. What are you doing today?", gloss: "좋군요. 오늘은 뭐 해요?" },
+    { keys: ["나빠요", "별로예요", "안좋아요"], standard: "Sorry to hear that. What happened?", gloss: "안타깝네요. 무슨 일이에요?" },
+    { keys: ["만나서반갑습니다", "반갑습니다", "반가워요"], standard: "Nice to meet you too.", gloss: "저도 만나서 반가워요." }
+  ];
+
+  function linesOk(lines) {
+    return lines && validEnglish(lines[0]) && validEnglish(lines[1]);
+  }
+
+  function enrich(partial, via) {
+    if (!partial) return null;
+    var phrase = partial.phraseId ? PHRASE_BY_ID[partial.phraseId] : null;
+    if (!phrase && partial.standard) {
+      var found = null;
+      for (var i = 0; i < PHRASES.length; i++) {
+        if (PHRASES[i].standard === partial.standard) { found = PHRASES[i]; break; }
+      }
+      phrase = found;
+      if (phrase) partial.phraseId = phrase.id;
     }
+    var next = (phrase && NEXT[phrase.id]) || { mode: "say", answer: pack3("Okay. Tell me a little more.", "Got it. What else?", "조금 더 말해 달라는 말이에요."), follow: pack3("Okay. Thank you.", "Got it. Thanks.", "알겠어요, 고마워요. 라고 받을 수 있어요.") };
+    var answer = linesOk(next.answer) ? next.answer : pack3("Okay. Tell me a little more.", "Got it. What else?", "조금 더 말해 달라는 말이에요.");
+    var spoken = via === "konglish" || via === "en-fuzzy";
+    if (spoken && phrase && validEnglish(phrase.standard)) {
+      partial.kind = "coach";
+      partial.leadKo = "발음을 고치고, 이어서 대화를 할게요.";
+      partial.standard = phrase.standard;
+      partial.casual = phrase.casual;
+      partial.glossStandard = phrase.gloss;
+      partial.glossCasual = phrase.casualGloss;
+      partial.coachKo = phrase.coach;
+      partial.soundKo = phrase.sound;
+      partial.slow = true;
+      partial.learnLang = "en";
+      partial.replyStandard = answer[0];
+      partial.replyCasual = answer[1];
+      partial.replyGloss = answer[2];
+      return partial;
+    }
+    return asTalk(answer, phrase ? phrase.id : partial.phraseId);
+  }
+
+  function asTalk(answer, phraseId) {
+    return {
+      kind: "talk",
+      phraseId: phraseId || null,
+      learnLang: null,
+      leadKo: "",
+      glossStandard: answer[2],
+      glossCasual: null,
+      standard: answer[0],
+      casual: null,
+      coachKo: null,
+      soundKo: null,
+      replyStandard: null,
+      replyCasual: null,
+      replyGloss: null,
+      slow: false
+    };
+  }
+
+  function asLesson(phrase) {
     return {
       kind: "lesson",
       phraseId: phrase.id,
-      learnLang: exactEn ? "en" : "ko",
-      leadKo: exactEn ? "잘 말했어요. 한 번 더 들을게요." : "이렇게 말해 보세요.",
+      learnLang: "ko",
+      leadKo: "이렇게 말하면 돼요.",
       glossStandard: phrase.gloss,
       glossCasual: phrase.casualGloss,
       standard: phrase.standard,
@@ -654,6 +738,79 @@
       soundKo: phrase.sound,
       slow: false
     };
+  }
+
+  function partnerForLesson(partial) {
+    var s = partial.standard || "";
+    if (/^Please come down|^Can you come down/.test(s)) return pack3("Okay. I'm coming down.", "Got it. On my way.", "알겠어요. 내려갈게요.");
+    if (/^Please come up|^Can you come up/.test(s)) return pack3("Okay. I'm coming up.", "Got it. On my way up.", "알겠어요. 올라갈게요.");
+    if (/^Please go down|^Can you go down/.test(s)) return pack3("Okay. I'm going down.", "Got it. Heading down.", "알겠어요. 내려갈게요.");
+    if (/^Please go up|^Can you go up/.test(s)) return pack3("Okay. I'm going up.", "Got it. Heading up.", "알겠어요. 올라갈게요.");
+    if (/^Please come |^Can you come /.test(s)) return pack3("Okay. I'm on my way.", "Got it. Coming now.", "알겠어요. 지금 갈게요.");
+    if (/^Please go |^Can you go /.test(s)) return pack3("Okay. I'm on my way.", "Got it. Going now.", "알겠어요. 지금 갈게요.");
+    if (/^I'll leave|^Please leave|^Just leave/.test(s)) return pack3("Okay. I'll grab it.", "Got it. I'll pick it up.", "알겠어요. 가져갈게요.");
+    if (/^Please open|^Can you open/.test(s)) return pack3("Sure. I'll open it.", "Okay. One second.", "네, 열게요.");
+    if (/^There is no elevator|^There's no elevator|^The elevator/.test(s)) return pack3("Okay. I'll take the stairs.", "Got it. I'll use the stairs.", "알겠어요. 계단으로 갈게요.");
+    if (/^I'm |^I've arrived|^I'll /.test(s)) return pack3("Okay. Thank you.", "Got it. Thanks.", "알겠어요. 고마워요.");
+    return pack3("Okay. Tell me a little more.", "Got it. What else?", "조금 더 말해 달라는 말이에요.");
+  }
+
+  function fromPhrase(phrase, via) {
+    if (!phrase || !validEnglish(phrase.standard) || !validEnglish(phrase.casual)) return null;
+    return enrich({
+      kind: "lesson",
+      phraseId: phrase.id,
+      learnLang: "ko",
+      leadKo: "이렇게 말해 보세요.",
+      glossStandard: phrase.gloss,
+      glossCasual: phrase.casualGloss,
+      standard: phrase.standard,
+      casual: phrase.casual,
+      coachKo: null,
+      soundKo: phrase.sound,
+      slow: false
+    }, via);
+  }
+
+  function matchChat(key) {
+    for (var i = 0; i < CHATS.length; i++) {
+      if (CHATS[i].keys.indexOf(key) !== -1) return CHATS[i];
+    }
+    return null;
+  }
+
+  function isStudyAsk(key) {
+    return /영어로/.test(key) || /어떻게말/.test(key) || /뭐라고/.test(key) || /표현/.test(key);
+  }
+
+  function stripStudy(key) {
+    return key
+      .replace(/영어로는|영어로|영어/g, "")
+      .replace(/어떻게말하면|어떻게말하지|어떻게말해요|어떻게말해|어떻게말하나요|어떻게말하죠|어떻게말/g, "")
+      .replace(/뭐라고말해요|뭐라고말해|뭐라고해요|뭐라고해|뭐라고/g, "")
+      .replace(/알려주세요|알려줘|알려줘요|알려주/g, "")
+      .replace(/해주세요|해줘요|해줘/g, "")
+      .replace(/뭐예요|뭐에요|뭔가요|뭐야|뭔가/g, "")
+      .replace(/표현은|표현/g, "")
+      .replace(/라고$/g, "")
+      .replace(/은요$|는요$|이요$|요$/g, "");
+  }
+
+  function findLoose(key) {
+    if (!key) return null;
+    if (INDEX[key]) return INDEX[key];
+    if (key.length < 4) return null;
+    var fuzzy = fuzzyMatch(key);
+    if (fuzzy) return { phrase: fuzzy.phrase, via: fuzzy.via };
+    var best = null;
+    Object.keys(INDEX).forEach(function (candidate) {
+      if (candidate.length < 4) return;
+      if (candidate.indexOf(key) === 0 || key.indexOf(candidate) === 0) {
+        var score = Math.min(candidate.length, key.length);
+        if (!best || score > best.score) best = { phrase: INDEX[candidate].phrase, via: INDEX[candidate].via, score: score };
+      }
+    });
+    return best;
   }
 
   function ask(message, mem) {
@@ -674,13 +831,17 @@
   }
 
   function withLast(partial, mem) {
-    var last = partial.standard ? {
-      standard: partial.standard,
-      casual: partial.casual,
-      glossStandard: partial.glossStandard,
-      glossCasual: partial.glossCasual,
-      coachKo: partial.coachKo,
-      soundKo: partial.soundKo,
+    var spoken = partial.standard || partial.replyStandard;
+    var last = spoken ? {
+      standard: partial.standard || partial.replyStandard,
+      casual: partial.casual || partial.replyCasual,
+      glossStandard: partial.glossStandard || partial.replyGloss,
+      glossCasual: partial.glossCasual || null,
+      replyStandard: partial.replyStandard || null,
+      replyCasual: partial.replyCasual || null,
+      replyGloss: partial.replyGloss || null,
+      coachKo: partial.coachKo || null,
+      soundKo: partial.soundKo || null,
       phraseId: partial.phraseId || null
     } : (mem.last || null);
     partial.next = { last: last };
@@ -709,11 +870,27 @@
         casual: mem.last.casual,
         coachKo: mem.last.coachKo || null,
         soundKo: mem.last.soundKo || null,
+        replyStandard: mem.last.replyStandard || null,
+        replyCasual: mem.last.replyCasual || null,
+        replyGloss: mem.last.replyGloss || null,
         slow: true,
         next: { last: mem.last }
       };
     }
     if (REPEAT_KEYS[key] || SLOW_KEYS[key]) return ask("아직 다시 말할 문장이 없어요. 먼저 하고 싶은 말을 해 주세요.", mem);
+    if (isStudyAsk(key)) {
+      var target = stripStudy(key);
+      if (!target) return ask("어떤 말을 영어로 알고 싶어요? 예를 들면, 로비로 내려오라고 영어로 뭐라고 해요.", mem);
+      var studied = findLoose(target);
+      if (studied && studied.phrase) return withLast(asLesson(studied.phrase), mem);
+      var asked = parseDelivery(target);
+      if (asked) {
+        asked.leadKo = "이렇게 말하면 돼요.";
+        asked.kind = "lesson";
+        return withLast(asked, mem);
+      }
+      return ask("그 말은 아직 없어요. 더 짧게 다시 말해 주세요.", mem);
+    }
     var alias = aliases[key];
     if (alias && PHRASE_BY_ID[alias.id || alias]) {
       var phrase = PHRASE_BY_ID[alias.id || alias];
@@ -726,17 +903,20 @@
       if (exact) return withLast(exact, mem);
     }
     var delivered = parseDelivery(key);
-    if (delivered) {
-      var tagged = PHRASES.filter(function (item) { return item.standard === delivered.standard; })[0];
-      if (tagged) delivered.phraseId = tagged.id;
-      return withLast(delivered, mem);
+    if (delivered) return withLast(asTalk(partnerForLesson(delivered), delivered.phraseId), mem);
+    var chat = matchChat(key);
+    if (chat && validEnglish(chat.standard)) {
+      return withLast(asTalk(pack3(chat.standard, chat.standard, chat.gloss), null), mem);
     }
     var fuzzy = fuzzyMatch(key);
     if (fuzzy) {
       var guessed = fromPhrase(fuzzy.phrase, fuzzy.via === "ko" ? "ko" : "konglish");
       if (guessed) return withLast(guessed, mem);
     }
-    return ask("잘 못 알아들었어요. 더 짧게 다시 말해 주세요. 예를 들면, 로비로 내려오세요.", mem);
+    if (mem.last && /[가-힣]/.test(text)) return ask("방금 말에 이어서 해 주세요. 더 짧게 말해도 돼요.", mem);
+    if (/[가-힣]/.test(text)) return ask("그 말은 아직 잘 모르겠어요. 더 짧게 다시 말해 주세요.", mem);
+    if (/[a-z]/i.test(text)) return ask("그 영어는 아직 연결이 안 돼요. 뜻을 한국어로 한 문장만 말해 주세요.", mem);
+    return ask("한 문장만 다시 말해 주세요.", mem);
   }
 
   function learn(heard, phraseId, lang, memory) {
@@ -757,6 +937,9 @@
       if (!validEnglish(phrase.standard)) bad.push(phrase.id + " standard");
       if (!validEnglish(phrase.casual)) bad.push(phrase.id + " casual");
       if (!phrase.coach || !phrase.sound) bad.push(phrase.id + " coach");
+      var next = NEXT[phrase.id];
+      if (next && next.answer && (!validEnglish(next.answer[0]) || !validEnglish(next.answer[1]))) bad.push(phrase.id + " answer");
+      if (next && next.follow && (!validEnglish(next.follow[0]) || !validEnglish(next.follow[1]))) bad.push(phrase.id + " follow");
     });
     return { phrases: PHRASES.length, bad: bad, dups: DUP_KEYS.slice() };
   }

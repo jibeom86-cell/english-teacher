@@ -131,9 +131,36 @@
       coach.textContent = turn.coachKo;
       art.appendChild(coach);
     }
-    if (turn.standard) {
+    if (turn.kind === "lesson" && turn.standard) {
       art.appendChild(variant("기본", turn.standard, turn.glossStandard));
       if (turn.casual && turn.casual !== turn.standard) art.appendChild(variant("편하게", turn.casual, turn.glossCasual));
+    } else if (turn.standard) {
+      var said = document.createElement("p");
+      said.className = "en";
+      said.lang = "en";
+      said.textContent = turn.standard;
+      art.appendChild(said);
+      if (turn.glossStandard) {
+        var gloss = document.createElement("p");
+        gloss.className = "gloss";
+        gloss.lang = "ko";
+        gloss.textContent = turn.glossStandard;
+        art.appendChild(gloss);
+      }
+    }
+    if (turn.replyStandard) {
+      var next = document.createElement("p");
+      next.className = "en next-line";
+      next.lang = "en";
+      next.textContent = turn.replyStandard;
+      art.appendChild(next);
+      if (turn.replyGloss) {
+        var nextGloss = document.createElement("p");
+        nextGloss.className = "gloss";
+        nextGloss.lang = "ko";
+        nextGloss.textContent = turn.replyGloss;
+        art.appendChild(nextGloss);
+      }
     }
     return art;
   }
@@ -161,7 +188,7 @@
     if (!data.turns.length && data.profile.done) {
       var hello = document.createElement("article");
       hello.className = "bubble teacher";
-      hello.innerHTML = "<p class='who'>선생님</p><p class='lead'>한국어로 말해 보세요. 영어를 읽어 보면 발음도 고쳐 줘요.</p>";
+      hello.innerHTML = "<p class='who'>선생님</p><p class='en' lang='en'>Hello. Nice to meet you.</p><p class='gloss' lang='ko'>안녕하세요. 만나서 반가워요. 이어서 말해 보세요.</p>";
       log.appendChild(hello);
     }
     if (liveText && mode !== "wake") {
@@ -249,7 +276,10 @@
       glossStandard: result.glossStandard,
       glossCasual: result.glossCasual,
       standard: result.standard,
-      casual: result.casual
+      casual: result.casual,
+      replyStandard: result.replyStandard,
+      replyCasual: result.replyCasual,
+      replyGloss: result.replyGloss
     });
     if (data.turns.length > 80) data.turns = data.turns.slice(-80);
     save();
@@ -262,7 +292,8 @@
     if (turn.kind === "repeat") {
       var slow = [{ text: "천천히 다시 말할게요.", lang: "ko-KR", rate: 0.95 }];
       if (turn.standard) slow.push({ text: turn.standard, lang: "en-US", rate: 0.6 });
-      if (turn.casual && turn.casual !== turn.standard) slow.push({ text: turn.casual, lang: "en-US", rate: 0.62 });
+      if (turn.replyGloss) slow.push({ text: turn.replyGloss, lang: "ko-KR", rate: 0.9 });
+      if (turn.replyStandard) slow.push({ text: turn.replyStandard, lang: "en-US", rate: 0.62 });
       return slow;
     }
     if (turn.kind === "coach") {
@@ -270,13 +301,16 @@
       if (turn.coachKo) coach.push({ text: turn.coachKo, lang: "ko-KR", rate: 0.9 });
       if (turn.soundKo) coach.push({ text: "소리는 " + turn.soundKo + " 예요.", lang: "ko-KR", rate: 0.86 });
       if (turn.standard) coach.push({ text: turn.standard, lang: "en-US", rate: 0.6 });
-      if (turn.casual && turn.casual !== turn.standard) coach.push({ text: turn.casual, lang: "en-US", rate: 0.66 });
+      if (turn.replyGloss) coach.push({ text: turn.replyGloss, lang: "ko-KR", rate: 0.9 });
+      if (turn.replyStandard) coach.push({ text: turn.replyStandard, lang: "en-US", rate: 0.78 });
       return coach;
     }
     var chunks = [];
     if (turn.glossStandard) chunks.push({ text: turn.glossStandard, lang: "ko-KR", rate: 0.92 });
     if (turn.standard) chunks.push({ text: turn.standard, lang: "en-US", rate: 0.78 });
-    if (turn.casual && turn.casual !== turn.standard) chunks.push({ text: turn.casual, lang: "en-US", rate: 0.82 });
+    if (turn.casual && turn.casual !== turn.standard && !turn.replyStandard) chunks.push({ text: turn.casual, lang: "en-US", rate: 0.82 });
+    if (turn.replyGloss) chunks.push({ text: turn.replyGloss, lang: "ko-KR", rate: 0.92 });
+    if (turn.replyStandard) chunks.push({ text: turn.replyStandard, lang: "en-US", rate: 0.78 });
     if (!chunks.length && turn.leadKo) chunks.push({ text: turn.leadKo, lang: "ko-KR", rate: 0.95 });
     return chunks;
   }
