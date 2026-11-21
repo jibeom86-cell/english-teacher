@@ -225,7 +225,10 @@
     save();
     hideSetup();
     render();
-    speakChunks([{ text: "이제 말만 하면 돼요. 화면이 켜져 있을 때 선생님이라고 불러도 돼요.", lang: "ko-KR", rate: 0.95 }]);
+    speakChunks([
+      { text: "Hello. Nice to meet you.", lang: "en-US", rate: 0.9 },
+      { text: "안녕하세요. 만나서 반가워요. 이어서 말해 보세요.", lang: "ko-KR", rate: 0.95 }
+    ]);
   }
 
   function captureSetup(text) {
@@ -288,30 +291,40 @@
   }
 
   function chunksFor(turn) {
-    if (turn.kind === "ask") return [{ text: turn.leadKo, lang: "ko-KR", rate: 0.95 }];
+    var chunks = [];
+    function add(text, lang, rate) {
+      if (text) chunks.push({ text: text, lang: lang, rate: rate });
+    }
+    if (turn.kind === "ask") {
+      add(turn.leadKo, "ko-KR", 0.95);
+      return chunks;
+    }
     if (turn.kind === "repeat") {
-      var slow = [{ text: "천천히 다시 말할게요.", lang: "ko-KR", rate: 0.95 }];
-      if (turn.standard) slow.push({ text: turn.standard, lang: "en-US", rate: 0.6 });
-      if (turn.replyGloss) slow.push({ text: turn.replyGloss, lang: "ko-KR", rate: 0.9 });
-      if (turn.replyStandard) slow.push({ text: turn.replyStandard, lang: "en-US", rate: 0.62 });
-      return slow;
+      add("천천히 다시 말할게요.", "ko-KR", 0.95);
+      add(turn.standard, "en-US", 0.6);
+      add(turn.replyStandard, "en-US", 0.62);
+      return chunks;
     }
     if (turn.kind === "coach") {
-      var coach = [];
-      if (turn.coachKo) coach.push({ text: turn.coachKo, lang: "ko-KR", rate: 0.9 });
-      if (turn.soundKo) coach.push({ text: "소리는 " + turn.soundKo + " 예요.", lang: "ko-KR", rate: 0.86 });
-      if (turn.standard) coach.push({ text: turn.standard, lang: "en-US", rate: 0.6 });
-      if (turn.replyGloss) coach.push({ text: turn.replyGloss, lang: "ko-KR", rate: 0.9 });
-      if (turn.replyStandard) coach.push({ text: turn.replyStandard, lang: "en-US", rate: 0.78 });
-      return coach;
+      add(turn.coachKo, "ko-KR", 0.9);
+      if (turn.soundKo) add("소리는 " + turn.soundKo + " 예요.", "ko-KR", 0.86);
+      add(turn.standard, "en-US", 0.6);
+      add(turn.replyStandard, "en-US", 0.86);
+      if (turn.replyGloss) add(turn.replyGloss, "ko-KR", 0.92);
+      return chunks;
     }
-    var chunks = [];
-    if (turn.glossStandard) chunks.push({ text: turn.glossStandard, lang: "ko-KR", rate: 0.92 });
-    if (turn.standard) chunks.push({ text: turn.standard, lang: "en-US", rate: 0.78 });
-    if (turn.casual && turn.casual !== turn.standard && !turn.replyStandard) chunks.push({ text: turn.casual, lang: "en-US", rate: 0.82 });
-    if (turn.replyGloss) chunks.push({ text: turn.replyGloss, lang: "ko-KR", rate: 0.92 });
-    if (turn.replyStandard) chunks.push({ text: turn.replyStandard, lang: "en-US", rate: 0.78 });
-    if (!chunks.length && turn.leadKo) chunks.push({ text: turn.leadKo, lang: "ko-KR", rate: 0.95 });
+    if (turn.kind === "lesson") {
+      add(turn.leadKo, "ko-KR", 0.95);
+      add(turn.glossStandard, "ko-KR", 0.92);
+      add(turn.standard, "en-US", 0.72);
+      if (turn.casual && turn.casual !== turn.standard) add(turn.casual, "en-US", 0.78);
+      return chunks;
+    }
+    add(turn.standard, "en-US", 0.9);
+    add(turn.replyStandard, "en-US", 0.9);
+    add(turn.glossStandard, "ko-KR", 0.95);
+    add(turn.replyGloss, "ko-KR", 0.95);
+    if (!chunks.length) add(turn.leadKo, "ko-KR", 0.95);
     return chunks;
   }
 
@@ -325,9 +338,17 @@
   }
 
   function unlockAudio() {
-    if (!window.speechSynthesis) return;
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
     try { window.speechSynthesis.getVoices(); } catch (error) {}
     try { window.speechSynthesis.resume(); } catch (error) {}
+    if (speaking) return;
+    try {
+      var prime = new SpeechSynthesisUtterance(".");
+      prime.lang = "en-US";
+      prime.volume = 0.01;
+      prime.rate = 2;
+      window.speechSynthesis.speak(prime);
+    } catch (error) {}
   }
 
   function clearWatchdog() {
@@ -379,8 +400,8 @@
       finished = true;
       speakNext(gen);
     }
-    utter.onend = done;
-    utter.onerror = done;
+    utter.onend = function () { setTimeout(done, 140); };
+    utter.onerror = function () { setTimeout(done, 140); };
     try { window.speechSynthesis.speak(utter); } catch (error) {
       queue = [];
       speaking = false;
@@ -388,6 +409,7 @@
       startWake();
       return;
     }
+    setStatus("말하는 중이에요.");
     var wait = Math.min(25000, Math.max(3500, (chunk.text.length * 180) / (utter.rate || 1) + 1200));
     watchdog = setTimeout(function () {
       if (finished || gen !== speakGen || id !== chunkId) return;
@@ -400,7 +422,6 @@
     destroyRec();
     mode = "off";
     setMicUi(false);
-    unlockAudio();
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance || !chunks || !chunks.length) {
       if (then) then();
       else startWake();
@@ -413,13 +434,18 @@
     speakGen += 1;
     queue = chunks.slice();
     clearWatchdog();
+    var gen = speakGen;
+    function begin() {
+      if (gen !== speakGen) return;
+      speaking = true;
+      try { synth.resume(); } catch (error) {}
+      ensureResumeLoop();
+      speakNext(gen);
+    }
     if (busy) {
       try { synth.cancel(); } catch (error) {}
-    }
-    speaking = true;
-    try { synth.resume(); } catch (error) {}
-    ensureResumeLoop();
-    speakNext(speakGen);
+      setTimeout(begin, 160);
+    } else begin();
   }
 
   function clearSilence() {
@@ -694,6 +720,7 @@
 
   function startTalk() {
     stopSpeaking();
+    unlockAudio();
     if (!micPrimed) primeMic();
     beginRec(inSetup() ? "setup" : "talk");
   }
